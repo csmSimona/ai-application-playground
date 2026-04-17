@@ -1,36 +1,133 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Application Playground
 
-## Getting Started
+一个基于 Next.js 的 AI 应用练习场，用来快速体验不同类型的 AI 应用形态。当前支持 OpenAI 兼容 Chat Completions 接口和 Anthropic Messages API，API Key、Base URL、Model 都在页面中手动填写，不写入服务端环境变量。
 
-First, run the development server:
+## 功能
+
+当前内置 5 个应用：
+
+- 视频脚本：根据主题、时长、创造力和参考资料生成短视频标题与脚本
+- 小红书文案：根据主题生成 5 个标题和一段正文
+- 聊天助手：支持前端会话历史的多轮聊天
+- PDF 问答：粘贴 PDF 文本后基于文档回答问题
+- CSV 分析：粘贴 CSV 内容和分析问题，生成文字、表格或图表数据建议
+
+## 技术栈
+
+- Next.js 16
+- React 19
+- TypeScript
+- Tailwind CSS 4
+
+## 本地运行
+
+安装依赖：
+
+```bash
+npm install
+```
+
+启动开发服务器：
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+打开：
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```txt
+http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+生产构建：
 
-## Learn More
+```bash
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+启动生产服务：
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run start
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+代码检查：
 
-## Deploy on Vercel
+```bash
+npm run lint
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 使用方式
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. 打开首页后，在“接入方式”中选择 `OpenAI` 或 `Anthropic`。
+2. 填写 API Key、Base URL 和 Model。
+3. 切换到想使用的应用。
+4. 填写应用表单并点击“开始生成”。
+
+默认接入配置：
+
+| 接入方 | 默认 Base URL | 默认 Model |
+| --- | --- | --- |
+| OpenAI | `https://api.openai.com/v1` | `gpt-5.4-mini` |
+| Anthropic | `https://api.anthropic.com/v1` | `claude-sonnet-4-6` |
+
+如果你使用的是兼容 OpenAI Chat Completions 的代理或网关，可以把 Base URL 改成自己的地址。
+
+## 项目结构
+
+```txt
+app/
+  page.tsx
+  globals.css
+  api/
+    generate/
+      route.ts
+  _components/
+    ai-playground.tsx
+    ai-playground/
+      access-panel.tsx
+      app-shell.tsx
+      constants.ts
+      payload.ts
+      tool-switcher.tsx
+      tool-workspace.tsx
+      types.ts
+      apps/
+        video-app.tsx
+        xiaohongshu-app.tsx
+        chat-app.tsx
+        pdf-app.tsx
+        csv-app.tsx
+docs/
+  add-app-guide.md
+```
+
+核心职责：
+
+- `app/_components/ai-playground.tsx`：页面入口控制器，维护状态、请求、提交、错误和聊天历史
+- `app/_components/ai-playground/access-panel.tsx`：接入配置表单
+- `app/_components/ai-playground/tool-switcher.tsx`：应用切换
+- `app/_components/ai-playground/tool-workspace.tsx`：根据当前应用渲染对应组件
+- `app/_components/ai-playground/app-shell.tsx`：应用通用布局、输入卡片和输出区域
+- `app/_components/ai-playground/payload.ts`：把前端表单转换为后端请求 payload
+- `app/api/generate/route.ts`：统一生成接口，适配 OpenAI 和 Anthropic
+
+## 生成接口
+
+前端统一请求：
+
+```txt
+POST /api/generate
+```
+
+请求体包含：
+
+- `tool`：当前应用 ID
+- `provider`：`openai` 或 `anthropic`
+- `apiKey`：用户填写的 API Key
+- `baseUrl`：用户填写的 Base URL
+- `model`：用户填写的模型名
+- `payload`：当前应用表单转换后的结构化数据
+
+后端会根据 `provider` 选择不同的供应商接口，并在 `buildMessages` 中为不同应用构造提示词。
+
