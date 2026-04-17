@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 import ChatApp from "./apps/chat-app";
 import CsvApp from "./apps/csv-app";
+import DrawGuessApp from "./apps/draw-guess-app";
 import PdfApp from "./apps/pdf-app";
 import VideoApp from "./apps/video-app";
 import XiaohongshuApp from "./apps/xiaohongshu-app";
@@ -55,6 +56,10 @@ export default function ToolWorkspace({
 
   if (activeTool === "pdf") {
     return <PdfApp {...appProps} />;
+  }
+
+  if (activeTool === "drawGuess") {
+    return <DrawGuessApp {...appProps} />;
   }
 
   return <CsvApp {...appProps} />;

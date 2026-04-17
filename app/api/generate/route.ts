@@ -1,5 +1,9 @@
+import { ChatAnthropic } from "@langchain/anthropic";
+import { AIMessage, HumanMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
+import { ChatOpenAI } from "@langchain/openai";
+
 type GenerateRequest = {
-  tool: "video" | "xiaohongshu" | "chat" | "pdf" | "csv";
+  tool: "video" | "xiaohongshu" | "chat" | "pdf" | "csv" | "drawGuess";
   provider?: "openai" | "anthropic";
   apiKey: string;
   baseUrl?: string;
@@ -9,8 +13,14 @@ type GenerateRequest = {
 
 type ChatMessage = {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: MessageContent;
 };
+
+type MessageContent = string | OpenAIContentBlock[];
+
+type OpenAIContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
 
 const PROVIDER_DEFAULTS = {
   openai: {
@@ -23,7 +33,6 @@ const PROVIDER_DEFAULTS = {
   },
 } as const;
 
-const ANTHROPIC_VERSION = "2023-06-01";
 const ANTHROPIC_MAX_TOKENS = 2000;
 
 // 较长的系统提示词放在服务端，集中约束各应用的生成行为。
@@ -53,23 +62,14 @@ export async function POST(request: Request) {
     const messages = buildMessages(body);
     const temperature = getTemperature(body);
 
-    // 前端保持统一请求格式，后端在这里适配不同供应商的接口结构。
-    const content =
-      provider === "anthropic"
-        ? await generateWithAnthropic({
-            apiKey: body.apiKey,
-            baseUrl,
-            messages,
-            model,
-            temperature,
-          })
-        : await generateWithOpenAI({
-            apiKey: body.apiKey,
-            baseUrl,
-            messages,
-            model,
-            temperature,
-          });
+    const content = await generateWithLangChain({
+      apiKey: body.apiKey,
+      baseUrl,
+      messages,
+      model,
+      provider,
+      temperature,
+    });
 
     return Response.json({ content });
   } catch (error) {
@@ -78,90 +78,44 @@ export async function POST(request: Request) {
   }
 }
 
-async function generateWithOpenAI({
+async function generateWithLangChain({
   apiKey,
   baseUrl,
   messages,
   model,
+  provider,
   temperature,
 }: {
   apiKey: string;
   baseUrl: string;
   messages: ChatMessage[];
   model: string;
+  provider: "openai" | "anthropic";
   temperature: number;
 }) {
-  // GPT-5 系列不接受部分旧 Chat Completions 参数，例如 temperature。
-  const requestBody = {
-    model,
-    messages,
-    ...(!model.startsWith("gpt-5") ? { temperature } : {}),
-  };
+  const langChainMessages = toLangChainMessages(messages);
+  const llm =
+    provider === "anthropic"
+      ? new ChatAnthropic({
+          anthropicApiUrl: baseUrl,
+          apiKey,
+          maxRetries: 1,
+          maxTokens: ANTHROPIC_MAX_TOKENS,
+          model,
+          temperature,
+        })
+      : new ChatOpenAI({
+          apiKey,
+          configuration: {
+            baseURL: baseUrl,
+          },
+          maxRetries: 1,
+          model,
+          ...(!model.startsWith("gpt-5") ? { temperature } : {}),
+        });
 
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(requestBody),
-  });
-
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    throw new Error(data?.error?.message || data?.message || `OpenAI 接口返回 ${response.status}`);
-  }
-
-  const content = data?.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error("模型没有返回内容。");
-  }
-
-  return content;
-}
-
-async function generateWithAnthropic({
-  apiKey,
-  baseUrl,
-  messages,
-  model,
-  temperature,
-}: {
-  apiKey: string;
-  baseUrl: string;
-  messages: ChatMessage[];
-  model: string;
-  temperature: number;
-}) {
-  // Anthropic Messages API 要求 system 指令和对话消息分开放置。
-  const { system, conversation } = toAnthropicMessages(messages);
-  const response = await fetch(`${baseUrl}/messages`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "anthropic-version": ANTHROPIC_VERSION,
-      "x-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: ANTHROPIC_MAX_TOKENS,
-      system,
-      messages: conversation,
-      temperature,
-    }),
-  });
-
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    throw new Error(data?.error?.message || data?.message || `Anthropic 接口返回 ${response.status}`);
-  }
-
-  const content = data?.content
-    ?.filter((item: { type?: string; text?: string }) => item.type === "text")
-    .map((item: { text?: string }) => item.text || "")
-    .join("");
+  const response = await llm.invoke(langChainMessages);
+  const content = normalizeContent(response.content);
 
   if (!content) {
     throw new Error("模型没有返回内容。");
@@ -176,8 +130,8 @@ function normalizeBaseUrl(baseUrl: string | undefined, provider: "openai" | "ant
 }
 
 function getTemperature(body: GenerateRequest) {
-  if (body.tool === "csv") {
-    // 数据分析尽量保持确定性。
+  if (body.tool === "csv" || body.tool === "drawGuess") {
+    // 分析和猜图都尽量保持稳定。
     return 0;
   }
 
@@ -192,6 +146,37 @@ function buildMessages(body: GenerateRequest): ChatMessage[] {
   const payload = body.payload;
 
   // 先构造一份供应商无关的消息列表，再分别适配 OpenAI 或 Anthropic。
+  if (body.tool === "drawGuess") {
+    const imageDataUrl = stringValue(payload.imageDataUrl);
+
+    if (!imageDataUrl) {
+      throw new Error("缺少画板图片，请先画一笔再让 AI 猜。");
+    }
+
+    return [
+      {
+        role: "system",
+        content:
+          "你正在玩中文你画我猜。请根据用户绘画内容进行简短猜测，只返回一句中文猜测，不要解释，不要列举多个答案。",
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: "请猜这张手绘图画的是什么。",
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: imageDataUrl,
+            },
+          },
+        ],
+      },
+    ];
+  }
+
   if (body.tool === "video") {
     return [
       {
@@ -259,24 +244,49 @@ ${stringValue(payload.sample)}
   ];
 }
 
-function toAnthropicMessages(messages: ChatMessage[]) {
-  // Anthropic 不接受 messages 中的 system 角色，需要汇总到顶层 system 字段。
-  const system = messages
-    .filter((message) => message.role === "system")
-    .map((message) => message.content)
-    .join("\n\n");
+function toLangChainMessages(messages: ChatMessage[]): BaseMessage[] {
+  return messages.map((message) => {
+    if (message.role === "system") {
+      return new SystemMessage(message.content);
+    }
 
-  const conversation = messages
-    .filter((message) => message.role !== "system")
-    .filter((message, index) => index > 0 || message.role === "user")
-    .map((message) => ({ role: message.role, content: message.content }));
+    if (message.role === "assistant") {
+      return new AIMessage(message.content);
+    }
 
-  return {
-    system,
-    conversation: conversation.length
-      ? conversation
-      : [{ role: "user" as const, content: "请继续。" }],
-  };
+    return new HumanMessage(message.content);
+  });
+}
+
+function normalizeContent(content: unknown): string {
+  if (typeof content === "string") {
+    return content.trim();
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+
+        if (
+          item &&
+          typeof item === "object" &&
+          "type" in item &&
+          "text" in item &&
+          item.type === "text"
+        ) {
+          return String(item.text ?? "");
+        }
+
+        return "";
+      })
+      .join("")
+      .trim();
+  }
+
+  return "";
 }
 
 function stringValue(value: unknown) {

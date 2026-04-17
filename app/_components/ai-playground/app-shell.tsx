@@ -11,8 +11,14 @@ type AppInputCardProps = {
   title: string;
 };
 
-export function AppLayout({ children }: { children: ReactNode }) {
-  return <div className="grid gap-6 xl:grid-cols-[1fr_0.95fr]">{children}</div>;
+export function AppLayout({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={`grid gap-6 xl:grid-cols-[1fr_0.95fr] ${className}`}>{children}</div>;
 }
 
 export function AppInputCard({

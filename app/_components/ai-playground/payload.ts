@@ -27,6 +27,10 @@ export function buildPayload(tool: ToolId, form: FormData) {
     return { prompt: text(form, "prompt") };
   }
 
+  if (tool === "drawGuess") {
+    return { imageDataUrl: text(form, "imageDataUrl") };
+  }
+
   const csv = text(form, "csv");
   const rows = parseCsvRows(csv);
   // 这里只发送少量样本给模型；当前 UI 是轻量工作台，不是完整 CSV 引擎。

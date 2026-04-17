@@ -6,6 +6,7 @@ export const tools: Array<{ id: ToolId; name: string; note: string }> = [
   { id: "chat", name: "聊天助手", note: "带前端会话记忆" },
   { id: "pdf", name: "PDF问答", note: "基于粘贴文本回答" },
   { id: "csv", name: "CSV分析", note: "读取列名和样本" },
+  { id: "drawGuess", name: "你画我猜", note: "画布作画，AI猜图" },
 ];
 
 export const providerOptions: Array<{ id: Provider; name: string; note: string }> = [
@@ -20,8 +21,8 @@ export const providerDefaults = {
     model: "gpt-5.4-mini",
   },
   anthropic: {
-    baseUrl: "https://api.anthropic.com/v1",
+    baseUrl: "https://api.minimaxi.com/anthropic",
     keyPlaceholder: "sk-ant-...",
-    model: "claude-sonnet-4-6",
+    model: "MiniMax-M2.7",
   },
 } as const;
