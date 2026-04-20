@@ -1,16 +1,18 @@
 # AI Application Playground
 
-一个基于 Next.js 的 AI 应用练习场，用来快速体验不同类型的 AI 应用形态。当前支持 OpenAI 兼容 Chat Completions 接口和 Anthropic Messages API，API Key、Base URL、Model 都在页面中手动填写，不写入服务端环境变量。
+一个基于 Next.js 的 AI 应用练习场，用来快速体验不同类型的 AI 应用形态。当前使用 Vercel AI SDK 接入模型，支持 OpenAI 兼容 Chat Completions 接口和 Anthropic Messages API。API Key、Base URL、Model 都在页面中手动填写，不写入服务端环境变量。
 
 ## 功能
 
-当前内置 5 个应用：
+当前内置 7 个应用：
 
 - 视频脚本：根据主题、时长、创造力和参考资料生成短视频标题与脚本
 - 小红书文案：根据主题生成 5 个标题和一段正文
 - 聊天助手：支持前端会话历史的多轮聊天
 - PDF 问答：粘贴 PDF 文本后基于文档回答问题
 - CSV 分析：粘贴 CSV 内容和分析问题，生成文字、表格或图表数据建议
+- 你画我猜：在画布中绘制简笔画，让支持视觉输入的模型猜测内容
+- 配色助手：根据描述生成可用于界面设计的配色方案
 
 ## 技术栈
 
@@ -18,6 +20,7 @@
 - React 19
 - TypeScript
 - Tailwind CSS 4
+- Vercel AI SDK
 
 ## 本地运行
 
@@ -69,7 +72,7 @@ npm run lint
 | 接入方 | 默认 Base URL | 默认 Model |
 | --- | --- | --- |
 | OpenAI | `https://api.openai.com/v1` | `gpt-5.4-mini` |
-| Anthropic | `https://api.anthropic.com/v1` | `claude-sonnet-4-6` |
+| Anthropic | `https://api.minimaxi.com/anthropic` | `MiniMax-M2.7` |
 
 如果你使用的是兼容 OpenAI Chat Completions 的代理或网关，可以把 Base URL 改成自己的地址。
 
@@ -98,6 +101,8 @@ app/
         chat-app.tsx
         pdf-app.tsx
         csv-app.tsx
+        draw-guess-app.tsx
+        color-palette-app.tsx
 docs/
   add-app-guide.md
 ```
@@ -110,7 +115,7 @@ docs/
 - `app/_components/ai-playground/tool-workspace.tsx`：根据当前应用渲染对应组件
 - `app/_components/ai-playground/app-shell.tsx`：应用通用布局、输入卡片和输出区域
 - `app/_components/ai-playground/payload.ts`：把前端表单转换为后端请求 payload
-- `app/api/generate/route.ts`：统一生成接口，适配 OpenAI 和 Anthropic
+- `app/api/generate/route.ts`：统一生成接口，使用 Vercel AI SDK 适配 OpenAI 和 Anthropic
 
 ## 生成接口
 
@@ -129,5 +134,9 @@ POST /api/generate
 - `model`：用户填写的模型名
 - `payload`：当前应用表单转换后的结构化数据
 
-后端会根据 `provider` 选择不同的供应商接口，并在 `buildMessages` 中为不同应用构造提示词。
+后端会根据 `provider` 创建对应的 AI SDK provider：
 
+- OpenAI：使用 `createOpenAI()` 和 `openai.chat(model)`，继续兼容 OpenAI Chat Completions 风格的 Base URL
+- Anthropic：使用 `createAnthropic()` 和 `anthropic(model)`，接入 Anthropic Messages API
+
+不同应用的提示词统一在 `buildMessages` 中构造，最终由 `generateText()` 生成文本结果。

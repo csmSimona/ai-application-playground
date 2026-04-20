@@ -12,6 +12,8 @@
 
 每个应用组件放在 `app/_components/ai-playground/apps/`，只负责自己的输入表单和输出区域。请求、loading、错误、结果和聊天历史都由 `ai-playground.tsx` 统一管理。
 
+后端统一在 `app/api/generate/route.ts` 中处理生成请求。当前项目使用 Vercel AI SDK 的 `generateText()` 调用模型，通过 `createOpenAI()` 和 `createAnthropic()` 分别适配 OpenAI 兼容接口与 Anthropic Messages API。
+
 ## 1. 增加应用 ID
 
 修改 `app/_components/ai-playground/types.ts`，给 `ToolId` 增加新的应用 ID。
@@ -148,7 +150,15 @@ if (tool === "title") {
 1. 给 `GenerateRequest.tool` 增加新应用 ID：
 
 ```ts
-tool: "video" | "xiaohongshu" | "chat" | "pdf" | "csv" | "title";
+tool:
+  | "video"
+  | "xiaohongshu"
+  | "chat"
+  | "pdf"
+  | "csv"
+  | "drawGuess"
+  | "colorPalette"
+  | "title";
 ```
 
 2. 在 `buildMessages` 中增加提示词分支：
@@ -168,7 +178,21 @@ if (body.tool === "title") {
 }
 ```
 
-后端会把这份统一的 `ChatMessage[]` 自动分发给 OpenAI 或 Anthropic，所以新增应用通常只需要补 `buildMessages`。
+后端会把这份统一的 `ChatMessage[]` 交给 `generateWithAISDK`，再根据用户选择的 `provider` 创建 OpenAI 或 Anthropic 模型实例，所以新增普通应用通常只需要补 `buildMessages`。
+
+如果新应用需要视觉输入，可以参考 `drawGuess`：用户消息的 `content` 可以是文本和图片组成的数组。
+
+```ts
+{
+  role: "user",
+  content: [
+    { type: "text", text: "请识别这张图片。" },
+    { type: "image", image: imageDataUrl },
+  ],
+}
+```
+
+`image` 可以是 data URL，也可以是模型供应商支持的图片 URL。
 
 ## 7. 调整温度参数
 
@@ -210,6 +234,13 @@ npm run build
 - 表单字段是否能正确提交
 - OpenAI 和 Anthropic 两种接入是否都能走到后端
 - 输出区域是否符合预期
+
+如果改到了后端模型调用、类型定义或依赖，建议同时运行：
+
+```bash
+npm run lint
+npm run build
+```
 
 ## 最小改动清单
 
