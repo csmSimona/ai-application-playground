@@ -1,6 +1,13 @@
 import type { FormEvent } from "react";
 
-export type ToolId = "video" | "xiaohongshu" | "chat" | "pdf" | "csv" | "drawGuess";
+export type ToolId =
+  | "video"
+  | "xiaohongshu"
+  | "chat"
+  | "pdf"
+  | "csv"
+  | "drawGuess"
+  | "colorPalette";
 
 export type Provider = "openai" | "anthropic";
 

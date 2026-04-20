@@ -7,6 +7,7 @@ export const tools: Array<{ id: ToolId; name: string; note: string }> = [
   { id: "pdf", name: "PDF问答", note: "基于粘贴文本回答" },
   { id: "csv", name: "CSV分析", note: "读取列名和样本" },
   { id: "drawGuess", name: "你画我猜", note: "画布作画，AI猜图" },
+  { id: "colorPalette", name: "配色助手", note: "描述生成色板" },
 ];
 
 export const providerOptions: Array<{ id: Provider; name: string; note: string }> = [

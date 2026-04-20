@@ -31,6 +31,15 @@ export function buildPayload(tool: ToolId, form: FormData) {
     return { imageDataUrl: text(form, "imageDataUrl") };
   }
 
+  if (tool === "colorPalette") {
+    return {
+      prompt: text(form, "prompt"),
+      colorCount: Number(text(form, "colorCount") || 5),
+      colorFormat: text(form, "colorFormat") || "hex",
+      style: text(form, "style"),
+    };
+  }
+
   const csv = text(form, "csv");
   const rows = parseCsvRows(csv);
   // 这里只发送少量样本给模型；当前 UI 是轻量工作台，不是完整 CSV 引擎。

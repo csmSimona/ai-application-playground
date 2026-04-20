@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import ChatApp from "./apps/chat-app";
+import ColorPaletteApp from "./apps/color-palette-app";
 import CsvApp from "./apps/csv-app";
 import DrawGuessApp from "./apps/draw-guess-app";
 import PdfApp from "./apps/pdf-app";
@@ -60,6 +61,10 @@ export default function ToolWorkspace({
 
   if (activeTool === "drawGuess") {
     return <DrawGuessApp {...appProps} />;
+  }
+
+  if (activeTool === "colorPalette") {
+    return <ColorPaletteApp {...appProps} />;
   }
 
   return <CsvApp {...appProps} />;
